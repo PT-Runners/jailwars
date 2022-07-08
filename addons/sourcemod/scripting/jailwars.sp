@@ -1,56 +1,66 @@
 // Includes
 #include <sourcemod>
 #include <sdktools>
-#include <sdkhooks>
 #include <cstrike>
+#include <multicolors>
+#include <myjailbreak>
 
 // Compiler Options
 #pragma semicolon 1
 #pragma newdecls required
 
-
 // Info
 public Plugin myinfo = {
     name = "PTR - JailWars add",
-    author = "Kamizun",
+    author = "Kamizun edited by Trayz",
     description = "Spawn gun and kev",
-    version = "1.0",
+    version = "1.1",
     url = ""
 };
 
 // Start
 public void OnPluginStart()
 {
-    HookEvent("round_start", Event_RoundStart);
+    HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
     HookEvent("player_spawn", Event_PlayerSpawn);
 }
 
 // Round start
 public void Event_RoundStart(Event event, char[] name, bool dontBroadcast)
 {
-    int player = GetRandomPlayerFromTeam(CS_TEAM_T);
-    if (!IsValidClient(player, false, false))
+    if(MyJailbreak_IsEventDayRunning() || GameRules_GetProp("m_bWarmupPeriod") == 1)
         return;
 
-    GivePlayerItem(player, "weapon_fiveseven");
+    int iMaxTries = 5;
+
+    for(int i = 1; i <= iMaxTries; i++)
+    {
+        int client = GetRandomPlayerFromTeam(CS_TEAM_T);
+
+        if (!IsValidClient(client, false, false))
+            continue;
+
+        GivePlayerItem(client, "weapon_fiveseven");
+        CPrintToChat(client, "{green}> {default}Recebeste uma fiveseven.");
+        break;
+    }
 }
 
 public void Event_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
 {
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (!IsValidClient(i, false, false))
-        {
-            return;
-        }
+    if(MyJailbreak_IsEventDayRunning() || GameRules_GetProp("m_bWarmupPeriod") == 1)
+        return;
 
-        if (GetClientTeam(i) != CS_TEAM_T)
-        {
-            return;
-        }
+    int client = GetClientOfUserId(event.GetInt("userid"));
 
-        SetEntProp(i, Prop_Data, "m_ArmorValue", 50);
-    }
+    if(!IsValidClient(client, false, false))
+        return;
+
+    if(GetClientTeam(client) != CS_TEAM_T)
+        return;
+
+    SetEntProp(client, Prop_Data, "m_ArmorValue", 50);
+    CPrintToChat(client, "{green}> {default}Recebeste 50 armadura.");
 }
 
 stock bool IsValidClient(int client, bool bots = true, bool dead = true)
