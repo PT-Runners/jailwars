@@ -9,25 +9,50 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+ConVar g_cvEnable;
+ConVar g_cvPrisonersArmor;
+ConVar g_cvRandomPrisonerWeapon;
+
+char g_sRandomPrisonerWeapon[64];
+
 // Info
 public Plugin myinfo = {
     name = "PTR - JailWars add",
     author = "Kamizun edited by Trayz",
     description = "Spawn gun and kev",
-    version = "1.1",
+    version = "1.2",
     url = ""
 };
 
 // Start
 public void OnPluginStart()
 {
+    g_cvEnable = CreateConVar("sm_jailwars_enable", "1", "Enable jailwars.", _, true, 0.0, true, 1.0);
+    g_cvPrisonersArmor = CreateConVar("sm_jailwars_prisoners_armor_value", "50", "Give armor prisoners on round start. 0 to disable", _, true, 0.0, true, 100.0);
+    g_cvRandomPrisonerWeapon = CreateConVar("sm_jailwars_random_prisoner_weapon", "weapon_fiveseven", "Give weapon to random prisoner on round start. Empty to disable", _, true, 0.0, true, 100.0);
+    g_cvRandomPrisonerWeapon.AddChangeHook(OnConVarChanged);
+
+    AutoExecConfig();
+
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
     HookEvent("player_spawn", Event_PlayerSpawn);
+}
+
+public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	if (convar == g_cvRandomPrisonerWeapon)
+        g_cvRandomPrisonerWeapon.GetString(g_sRandomPrisonerWeapon, sizeof(g_sRandomPrisonerWeapon));
 }
 
 // Round start
 public void Event_RoundStart(Event event, char[] name, bool dontBroadcast)
 {
+    if(!g_cvEnable.BoolValue)
+        return;
+
+    if(StrEqual(g_sRandomPrisonerWeapon, ""))
+        return;
+
     if(MyJailbreak_IsEventDayRunning() || GameRules_GetProp("m_bWarmupPeriod") == 1)
         return;
 
@@ -40,14 +65,25 @@ public void Event_RoundStart(Event event, char[] name, bool dontBroadcast)
         if (!IsValidClient(client, false, false))
             continue;
 
-        GivePlayerItem(client, "weapon_fiveseven");
-        CPrintToChat(client, "{green}> {default}Recebeste uma fiveseven.");
+        GivePlayerItem(client, g_sRandomPrisonerWeapon);
+
+        char szWeaponName[64];
+        strcopy(szWeaponName, sizeof(szWeaponName), g_sRandomPrisonerWeapon);
+        ReplaceString(szWeaponName, sizeof(szWeaponName), "weapon_", "");
+
+        CPrintToChat(client, "{green}> {default}Recebeste uma %s.", szWeaponName);
         break;
     }
 }
 
 public void Event_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
 {
+    if(!g_cvEnable.BoolValue)
+        return;
+
+    if(!g_cvPrisonersArmor.IntValue)
+        return;
+
     if(MyJailbreak_IsEventDayRunning() || GameRules_GetProp("m_bWarmupPeriod") == 1)
         return;
 
@@ -59,8 +95,8 @@ public void Event_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
     if(GetClientTeam(client) != CS_TEAM_T)
         return;
 
-    SetEntProp(client, Prop_Data, "m_ArmorValue", 50);
-    CPrintToChat(client, "{green}> {default}Recebeste 50 armadura.");
+    SetEntProp(client, Prop_Data, "m_ArmorValue", g_cvPrisonersArmor.IntValue);
+    CPrintToChat(client, "{green}> {default}Recebeste %i armadura.", g_cvPrisonersArmor.IntValue);
 }
 
 stock bool IsValidClient(int client, bool bots = true, bool dead = true)
