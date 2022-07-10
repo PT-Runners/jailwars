@@ -1,0 +1,51 @@
+"Phrases"
+{
+    "Jailwars Disabled"
+    {
+        "en"       "> O jailwars encontra-se {darkred}desativado{default}."
+    }
+
+    "Global Round Disqualified No Reason"
+	{
+		"en"		">> Ronda desqualificada <<"
+	}
+
+    "Global Round Disqualified With Reason"
+	{
+		"#format"	"{1:s}"
+		"en"		">> Ronda desqualificada devido a {1} <<"
+	}
+
+    "Chat Round Disqualified No Reason"
+	{
+		"en"		"> {darkred}Ronda desqualificada!"
+	}
+
+    "Chat Round Disqualified With Reason"
+	{
+		"#format"	"{1:s}"
+		"en"		"> {darkred}Ronda desqualificada {default}devido a {lightred}{1}!"
+	}
+
+    "Round Already Disqualified"
+    {
+        "#format"	"{1:N}"
+        "en"		"A ronda já foi {darkred}desqualificada{default} por {darkblue}{1}{default}."
+    }
+
+	"CMD_Swap_Usage"
+	{
+		"en"		"[SM] Usa: sm_swaprs <target> <[0/1] agora/ronda seguinte>"
+	}
+	
+	"CMD_Swap"
+	{
+		"#format"	"{1:t}"
+		"en"		"{1} foi trocado de equipa (resetscore)"
+	}
+
+	"CMD_OnlyInTeam"
+	{
+		"en"		"[SM] Apenas podes usar se o jogador estiver numa equipa!"
+	}
+}
