@@ -47,7 +47,7 @@ public Plugin myinfo = {
     name = "PTR - JailWars add",
     author = "Kamizun edited by Trayz",
     description = "Spawn gun and kev",
-    version = "1.2",
+    version = "1.3",
     url = ""
 };
 
@@ -56,7 +56,7 @@ public void OnPluginStart()
 {
     g_cvEnable = CreateConVar("sm_jailwars_enable", "1", "Enable jailwars.", _, true, 0.0, true, 1.0);
     g_cvPrisonersArmor = CreateConVar("sm_jailwars_prisoners_armor_value", "50", "Give armor prisoners on round start. 0 to disable", _, true, 0.0, true, 100.0);
-    g_cvRandomPrisonerWeapon = CreateConVar("sm_jailwars_random_prisoner_weapon", "weapon_fiveseven", "Give weapon to random prisoner on round start. Empty to disable", _, true, 0.0, true, 100.0);
+    g_cvRandomPrisonerWeapon = CreateConVar("sm_jailwars_random_prisoner_weapon", "weapon_fiveseven", "Give weapon to random prisoner on round start. Empty to disable");
     g_cvRandomPrisonerWeapon.AddChangeHook(OnConVarChanged);
 
     g_cvLogEnable = CreateConVar("sm_jailwars_log_enable", "1", "Enable jailwars log.", _, true, 0.0, true, 1.0);
