@@ -47,7 +47,7 @@ public Plugin myinfo = {
     name = "PTR - JailWars add",
     author = "Kamizun edited by Trayz",
     description = "Spawn gun and kev",
-    version = "1.3",
+    version = "1.4",
     url = ""
 };
 
