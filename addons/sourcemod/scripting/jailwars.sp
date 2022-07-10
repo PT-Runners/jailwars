@@ -410,7 +410,7 @@ void DisplayCenterTextToAll(const char[] message, any ...)
     }
 }
 
-stock char LogActionEx(int client, char[] message, any ...)
+stock void LogActionEx(int client, char[] message, any ...)
 {
     char buffer[256];
     SetGlobalTransTarget(LANG_SERVER);
