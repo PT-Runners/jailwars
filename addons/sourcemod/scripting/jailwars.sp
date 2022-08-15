@@ -22,7 +22,7 @@ enum struct ScoreboardStats
     int iAssists;
 }
 
-ScoreboardStats g_iScoreBoard[MAXPLAYERS + 1];
+ScoreboardStats g_iScoreBoard[MAXPLAYERS + 1][2];
 
 ConVar g_cvEnable;
 ConVar g_cvPrisonersArmor;
@@ -80,7 +80,6 @@ public void OnPluginStart()
 
     HookEvent("round_prestart", Event_RoundPreStart, EventHookMode_Pre);
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
-    HookEvent("player_spawn", Event_PlayerSpawn);
 }
 
 public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -124,12 +123,17 @@ public void Event_RoundPreStart(Handle event, const char[] name, bool dontBroadc
     {
         if(!IsClientInGame(i))
             continue;
+
+        int indexTeam = GetIndexTeamScoreboard(GetClientTeam(i));
+
+        if(indexTeam == -1)
+            continue;
         
-        g_iScoreBoard[i].iFrags = GetEntProp(i, Prop_Data, "m_iFrags");
-        g_iScoreBoard[i].iDeaths = GetEntProp(i, Prop_Data, "m_iDeaths");
-        g_iScoreBoard[i].iMVPs = CS_GetMVPCount(i);
-        g_iScoreBoard[i].iScore = CS_GetClientContributionScore(i);
-        g_iScoreBoard[i].iAssists = CS_GetClientAssists(i);
+        g_iScoreBoard[i][indexTeam].iFrags = GetEntProp(i, Prop_Data, "m_iFrags");
+        g_iScoreBoard[i][indexTeam].iDeaths = GetEntProp(i, Prop_Data, "m_iDeaths");
+        g_iScoreBoard[i][indexTeam].iMVPs = CS_GetMVPCount(i);
+        g_iScoreBoard[i][indexTeam].iScore = CS_GetClientContributionScore(i);
+        g_iScoreBoard[i][indexTeam].iAssists = CS_GetClientAssists(i);
     }
 }
 
@@ -183,38 +187,22 @@ public void OnPlayerSpawnPost(int client)
     if(!IsPlayerAlive(client))
         return;
 
-    SetEntProp(client, Prop_Data, "m_iFrags", g_iScoreBoard[client].iFrags);
+    SetArmorPrisioner(client);
 
-    SetEntProp(client, Prop_Data, "m_iDeaths", g_iScoreBoard[client].iDeaths);
+    int indexTeam = GetIndexTeamScoreboard(GetClientTeam(client));
 
-    CS_SetMVPCount(client, g_iScoreBoard[client].iMVPs);
-
-    CS_SetClientContributionScore(client, g_iScoreBoard[client].iScore);
-
-    CS_SetClientAssists(client, g_iScoreBoard[client].iAssists);
-}
-
-public void Event_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
-{
-    if(!g_cvEnable.BoolValue)
+    if(indexTeam == -1)
         return;
 
-    if(!g_cvPrisonersArmor.IntValue)
-        return;
+    SetEntProp(client, Prop_Data, "m_iFrags", g_iScoreBoard[client][indexTeam].iFrags);
 
-    if(MyJailbreak_IsEventDayRunning() || GameRules_GetProp("m_bWarmupPeriod") == 1)
-        return;
+    SetEntProp(client, Prop_Data, "m_iDeaths", g_iScoreBoard[client][indexTeam].iDeaths);
 
-    int client = GetClientOfUserId(event.GetInt("userid"));
+    CS_SetMVPCount(client, g_iScoreBoard[client][indexTeam].iMVPs);
 
-    if(!IsValidClient(client, false, false))
-        return;
+    CS_SetClientContributionScore(client, g_iScoreBoard[client][indexTeam].iScore);
 
-    if(GetClientTeam(client) != CS_TEAM_T)
-        return;
-
-    SetEntProp(client, Prop_Data, "m_ArmorValue", g_cvPrisonersArmor.IntValue);
-    CPrintToChat(client, "{green}> {default}Recebeste %i armadura.", g_cvPrisonersArmor.IntValue);
+    CS_SetClientAssists(client, g_iScoreBoard[client][indexTeam].iAssists);
 }
 
 public Action Command_Pause(int client, int args)
@@ -306,6 +294,25 @@ public Action CMD_SwapRs(int client, int args)
             team = GetClientTeam(target_list[i]);
             if(team >= 2)
             {
+                int indexTeam = GetIndexTeamScoreboard(team);
+                
+                int oppositeIndexTeam = GetOppositeIndexTeamScoreboard(team);
+
+                g_iScoreBoard[target_list[i]][indexTeam].iFrags = GetEntProp(target_list[i], Prop_Data, "m_iFrags");
+                SetEntProp(target_list[i], Prop_Data, "m_iFrags", g_iScoreBoard[target_list[i]][oppositeIndexTeam].iFrags);
+
+                g_iScoreBoard[target_list[i]][indexTeam].iDeaths = GetEntProp(target_list[i], Prop_Data, "m_iDeaths");
+                SetEntProp(target_list[i], Prop_Data, "m_iDeaths", g_iScoreBoard[target_list[i]][oppositeIndexTeam].iDeaths);
+
+                g_iScoreBoard[target_list[i]][indexTeam].iMVPs = CS_GetMVPCount(target_list[i]);
+                CS_SetMVPCount(target_list[i], g_iScoreBoard[target_list[i]][oppositeIndexTeam].iMVPs);
+
+                g_iScoreBoard[target_list[i]][indexTeam].iScore = CS_GetClientContributionScore(target_list[i]);
+                CS_SetClientContributionScore(target_list[i], g_iScoreBoard[target_list[i]][oppositeIndexTeam].iScore);
+
+                g_iScoreBoard[target_list[i]][indexTeam].iAssists = CS_GetClientAssists(target_list[i]);
+                CS_SetClientAssists(target_list[i], g_iScoreBoard[target_list[i]][oppositeIndexTeam].iAssists);
+
                 if(!value)
                 {
                     if(team == CS_TEAM_T)
@@ -333,21 +340,6 @@ public Action CMD_SwapRs(int client, int args)
                         SetEntProp(target_list[i], Prop_Data, "m_iPendingTeamNum", CS_TEAM_T);
                     }
                 }
-
-                g_iScoreBoard[target_list[i]].iFrags = 0;
-                SetEntProp(target_list[i], Prop_Data, "m_iFrags", g_iScoreBoard[target_list[i]].iFrags);
-
-                g_iScoreBoard[target_list[i]].iDeaths = 0;
-                SetEntProp(target_list[i], Prop_Data, "m_iDeaths", g_iScoreBoard[target_list[i]].iDeaths);
-
-                g_iScoreBoard[target_list[i]].iMVPs = 0;
-                CS_SetMVPCount(target_list[i], g_iScoreBoard[target_list[i]].iMVPs);
-
-                g_iScoreBoard[target_list[i]].iScore = 0;
-                CS_SetClientContributionScore(target_list[i], g_iScoreBoard[target_list[i]].iScore);
-
-                g_iScoreBoard[target_list[i]].iAssists = 0;
-                CS_SetClientAssists(target_list[i], g_iScoreBoard[target_list[i]].iAssists);
             }
             else if(!tn_is_ml)
             {
@@ -444,6 +436,27 @@ public Action Command_RoundDisqualified(int client, int args)
     return Plugin_Handled;
 }
 
+void SetArmorPrisioner(int client)
+{
+    if(!g_cvEnable.BoolValue)
+        return;
+
+    if(!g_cvPrisonersArmor.IntValue)
+        return;
+
+    if(MyJailbreak_IsEventDayRunning() || GameRules_GetProp("m_bWarmupPeriod") == 1)
+        return;
+
+    if(!IsValidClient(client, false, false))
+        return;
+
+    if(GetClientTeam(client) != CS_TEAM_T)
+        return;
+
+    SetEntProp(client, Prop_Data, "m_ArmorValue", g_cvPrisonersArmor.IntValue);
+    CPrintToChat(client, "{green}> {default}Recebeste %i armadura.", g_cvPrisonersArmor.IntValue);
+}
+
 void DisplayCenterTextToAll(const char[] message, any ...)
 {
     char buffer[MAX_MESSAGE_LENGTH];
@@ -504,7 +517,52 @@ stock int GetRandomPlayerFromTeam(int team)
     return (clientCount == 0) ? -1 : clients[GetRandomInt(0, clientCount - 1)];
 }
 
-stock bool Pause(float pauseTime = 120.0)
+public Action Timer_RoundTimer(Handle timer)
+{
+    if(g_hRoundTimer == null)
+        return Plugin_Stop;
+
+    g_iRoundTime += 1;
+    return Plugin_Continue;
+}
+
+public Action Timer_Unpause(Handle timer)
+{
+    if(!IsPaused())
+        return Plugin_Stop;
+
+    Unpause();
+    return Plugin_Stop;
+}
+
+int GetOppositeIndexTeamScoreboard(int team)
+{
+    if(team == CS_TEAM_T)
+        return 1;
+
+    if(team == CS_TEAM_CT)
+        return 0;
+
+    return -1;
+}
+
+int GetIndexTeamScoreboard(int team)
+{
+    if(team == CS_TEAM_T)
+        return 0;
+
+    if(team == CS_TEAM_CT)
+        return 1;
+
+    return -1;
+}
+
+bool IsPaused()
+{
+    return g_hRoundTimer != null;
+}
+
+void Pause(float pauseTime)
 {
     if (g_hRoundTimer != null)
     {
@@ -529,30 +587,7 @@ stock bool Pause(float pauseTime = 120.0)
     CreateTimer(pauseTime, Timer_Unpause);
 }
 
-public Action Timer_RoundTimer(Handle timer)
-{
-    if(g_hRoundTimer == null)
-        return Plugin_Stop;
-
-    g_iRoundTime += 1;
-    return Plugin_Continue;
-}
-
-public Action Timer_Unpause(Handle timer)
-{
-    if(!IsPaused())
-        return Plugin_Stop;
-
-    Unpause();
-    return Plugin_Stop;
-}
-
-stock bool IsPaused()
-{
-    return g_hRoundTimer != null;
-}
-
-stock void Unpause()
+void Unpause()
 {
     if (g_hRoundTimer != null)
     {
