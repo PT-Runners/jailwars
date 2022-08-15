@@ -29,8 +29,10 @@ ConVar g_cvPrisonersArmor;
 ConVar g_cvRandomPrisonerWeapon;
 ConVar g_cvLogEnable;
 ConVar g_cvRoundDisqualifiedEndTime;
+ConVar g_cvPauseTime;
 
 Handle g_hHUD;
+Handle g_hRoundTimer;
 
 float g_fHudPosX = -1.0;
 float g_fHudPosY = 0.2;
@@ -41,6 +43,7 @@ char g_sFilePath[PLATFORM_MAX_PATH];
 
 int g_iHudRgba[4] = { 139, 0, 0 , 255};
 int g_iClientInChargeRoundDisqualified = -1;
+int g_iRoundTime = -1;
 
 // Info
 public Plugin myinfo = {
@@ -61,6 +64,7 @@ public void OnPluginStart()
 
     g_cvLogEnable = CreateConVar("sm_jailwars_log_enable", "1", "Enable jailwars log.", _, true, 0.0, true, 1.0);
     g_cvRoundDisqualifiedEndTime = CreateConVar("sm_jailwars_round_disqualified_round_end_time", "5.0", "Time to wait to end round after desqualified", _, true, 0.0, true, 10.0);
+    g_cvPauseTime = CreateConVar("sm_jailwars_pause_time", "120.0", "Pause time for !pause", _, true, 0.0, true, 320.0);
 
     AutoExecConfig();
 
@@ -68,6 +72,7 @@ public void OnPluginStart()
 
     RegAdminCmd("sm_disqualify", Command_RoundDisqualified, ADMFLAG_BAN);
     RegAdminCmd("sm_desqualificar", Command_RoundDisqualified, ADMFLAG_BAN);
+    RegAdminCmd("sm_pause", Command_Pause, ADMFLAG_BAN);
 
     RegAdminCmd("sm_swaprs", CMD_SwapRs, ADMFLAG_BAN, "Swap the targets team");
 
@@ -112,6 +117,9 @@ public void OnConfigsExecuted()
 
 public void Event_RoundPreStart(Handle event, const char[] name, bool dontBroadcast)
 {
+    delete g_hRoundTimer;
+    g_iRoundTime = -1;
+
     for(int i = 1; i < MAXPLAYERS; i++)
     {
         if(!IsClientInGame(i))
@@ -207,6 +215,48 @@ public void Event_PlayerSpawn(Event event, char[] name, bool dontBroadcast)
 
     SetEntProp(client, Prop_Data, "m_ArmorValue", g_cvPrisonersArmor.IntValue);
     CPrintToChat(client, "{green}> {default}Recebeste %i armadura.", g_cvPrisonersArmor.IntValue);
+}
+
+public Action Command_Pause(int client, int args)
+{
+    if(!g_cvEnable.BoolValue)
+    {
+        CPrintToChat(client, "%t", "Jailwars Disabled");
+        return Plugin_Handled;
+    }
+
+    if(IsPaused())
+    {
+        Unpause();
+
+        CPrintToChatAll("{green}--------------{default}");
+        CPrintToChatAll("%t", "Unpaused");
+        CPrintToChatAll("{green}--------------{default}");
+        return Plugin_Handled;
+    }
+
+    float pauseTime = g_cvPauseTime.FloatValue;
+
+    char buffer[6];
+    GetCmdArg(1, buffer, sizeof(buffer));
+
+    if(!StrEqual(buffer, ""))
+    {
+        pauseTime = StringToFloat(buffer);
+    }
+
+    if(pauseTime == 0.0)
+    {
+        pauseTime = 600.0;
+    }
+    
+    Pause(pauseTime);
+
+    CPrintToChatAll("{darkred}--------------{default}");
+    CPrintToChatAll("%t", "Paused");
+    CPrintToChatAll("{darkred}--------------{default}");
+
+    return Plugin_Handled;
 }
 
 public Action CMD_SwapRs(int client, int args)
@@ -452,4 +502,91 @@ stock int GetRandomPlayerFromTeam(int team)
     if (IsClientInGame(i) && (GetClientTeam(i) == team))
         clients[clientCount++] = i;
     return (clientCount == 0) ? -1 : clients[GetRandomInt(0, clientCount - 1)];
-}  
+}
+
+stock bool Pause(float pauseTime = 120.0)
+{
+    if (g_hRoundTimer != null)
+    {
+        KillTimer(g_hRoundTimer);
+        g_hRoundTimer = null;
+    }
+
+    g_iRoundTime = GameRules_GetProp("m_iRoundTime", 4, 0);
+    
+    GameRules_SetProp("m_iRoundTime", -1);
+
+    for(int i = 1; i < MaxClients; i++) {
+
+        if(!IsValidClient(i, true, false))
+            continue;
+
+        SetEntityMoveType(i, MOVETYPE_NONE);
+        DarkenScreen(i, true);
+    }
+
+    g_hRoundTimer = CreateTimer(1.0, Timer_RoundTimer, _, TIMER_REPEAT);
+    CreateTimer(pauseTime, Timer_Unpause);
+}
+
+public Action Timer_RoundTimer(Handle timer)
+{
+    if(g_hRoundTimer == null)
+        return Plugin_Stop;
+
+    g_iRoundTime += 1;
+    return Plugin_Continue;
+}
+
+public Action Timer_Unpause(Handle timer)
+{
+    if(!IsPaused())
+        return Plugin_Stop;
+
+    Unpause();
+    return Plugin_Stop;
+}
+
+stock bool IsPaused()
+{
+    return g_hRoundTimer != null;
+}
+
+stock void Unpause()
+{
+    if (g_hRoundTimer != null)
+    {
+        KillTimer(g_hRoundTimer);
+        g_hRoundTimer = null;
+    }
+
+    GameRules_SetProp("m_iRoundTime", g_iRoundTime, 4, 0);
+
+    for(int i = 1; i < MaxClients; i++) {
+
+        if(!IsValidClient(i, true, false))
+            continue;
+
+        SetEntityMoveType(i, MOVETYPE_WALK);
+        DarkenScreen(i, false);
+    }
+
+    g_iRoundTime = -1;
+}
+
+stock void DarkenScreen(int client, bool dark)
+{
+	Handle hFadeClient = StartMessageOne("Fade", client);
+	PbSetInt(hFadeClient, "duration", 1);
+	PbSetInt(hFadeClient, "hold_time", 3);
+	if(!dark)
+	{
+		PbSetInt(hFadeClient, "flags", 0x0010); // FFADE_STAYOUT	0x0008		ignores the duration, stays faded out until new ScreenFade message received
+	}
+	else
+	{
+		PbSetInt(hFadeClient, "flags", 0x0008); // FFADE_PURGE		0x0010		Purges all other fades, replacing them with this one
+	}
+	PbSetColor(hFadeClient, "clr", {0, 0, 0, 255});
+	EndMessage();
+}

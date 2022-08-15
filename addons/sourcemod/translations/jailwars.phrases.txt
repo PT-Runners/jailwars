@@ -35,7 +35,7 @@
 
 	"CMD_Swap_Usage"
 	{
-		"en"		"[SM] Usa: sm_swaprs <target> <[0/1] agora/ronda seguinte>"
+		"en"		"> Usa: sm_swaprs <target> <[0/1] agora/ronda seguinte>"
 	}
 	
 	"CMD_Swap"
@@ -46,6 +46,16 @@
 
 	"CMD_OnlyInTeam"
 	{
-		"en"		"[SM] Apenas podes usar se o jogador estiver numa equipa!"
+		"en"		"> Apenas podes usar se o jogador estiver numa equipa!"
+	}
+
+	"Paused"
+	{
+		"en"		"A ronda foi {darkred}pausada{default}."
+	}
+
+	"Unpaused"
+	{
+		"en"		"A ronda foi {green}retomada{default}."
 	}
 }
