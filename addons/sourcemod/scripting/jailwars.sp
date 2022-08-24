@@ -72,10 +72,15 @@ public void OnPluginStart()
 
     RegAdminCmd("sm_disqualify", Command_RoundDisqualified, ADMFLAG_BAN);
     RegAdminCmd("sm_desqualificar", Command_RoundDisqualified, ADMFLAG_BAN);
+
+    RegAdminCmd("sm_disqualifyplayer", Command_RoundDisqualifiedPlayer, ADMFLAG_BAN);
+    RegAdminCmd("sm_desqualificarjogador", Command_RoundDisqualifiedPlayer, ADMFLAG_BAN);
+
     RegAdminCmd("sm_pause", Command_Pause, ADMFLAG_BAN);
 
     RegAdminCmd("sm_swaprs", CMD_SwapRs, ADMFLAG_BAN, "Swap the targets team");
 
+    LoadTranslations("common.phrases.txt");
     LoadTranslations("jailwars.phrases");
 
     HookEvent("round_prestart", Event_RoundPreStart, EventHookMode_Pre);
@@ -294,52 +299,7 @@ public Action CMD_SwapRs(int client, int args)
             team = GetClientTeam(target_list[i]);
             if(team >= 2)
             {
-                int indexTeam = GetIndexTeamScoreboard(team);
-                
-                int oppositeIndexTeam = GetOppositeIndexTeamScoreboard(team);
-
-                g_iScoreBoard[target_list[i]][indexTeam].iFrags = GetEntProp(target_list[i], Prop_Data, "m_iFrags");
-                SetEntProp(target_list[i], Prop_Data, "m_iFrags", g_iScoreBoard[target_list[i]][oppositeIndexTeam].iFrags);
-
-                g_iScoreBoard[target_list[i]][indexTeam].iDeaths = GetEntProp(target_list[i], Prop_Data, "m_iDeaths");
-                SetEntProp(target_list[i], Prop_Data, "m_iDeaths", g_iScoreBoard[target_list[i]][oppositeIndexTeam].iDeaths);
-
-                g_iScoreBoard[target_list[i]][indexTeam].iMVPs = CS_GetMVPCount(target_list[i]);
-                CS_SetMVPCount(target_list[i], g_iScoreBoard[target_list[i]][oppositeIndexTeam].iMVPs);
-
-                g_iScoreBoard[target_list[i]][indexTeam].iScore = CS_GetClientContributionScore(target_list[i]);
-                CS_SetClientContributionScore(target_list[i], g_iScoreBoard[target_list[i]][oppositeIndexTeam].iScore);
-
-                g_iScoreBoard[target_list[i]][indexTeam].iAssists = CS_GetClientAssists(target_list[i]);
-                CS_SetClientAssists(target_list[i], g_iScoreBoard[target_list[i]][oppositeIndexTeam].iAssists);
-
-                if(!value)
-                {
-                    if(team == CS_TEAM_T)
-                    {
-                        CS_SwitchTeam(target_list[i], CS_TEAM_CT);
-                    }
-                    else
-                    {
-                        CS_SwitchTeam(target_list[i], CS_TEAM_T);
-                    }
-                    
-                    if(IsPlayerAlive(target_list[i]))
-                    {
-                        CS_RespawnPlayer(target_list[i]);
-                    }
-                }
-                else
-                {
-                    if(team == CS_TEAM_T)
-                    {
-                        SetEntProp(target_list[i], Prop_Data, "m_iPendingTeamNum", CS_TEAM_CT);
-                    }
-                    else
-                    {
-                        SetEntProp(target_list[i], Prop_Data, "m_iPendingTeamNum", CS_TEAM_T);
-                    }
-                }
+                SwapTeam(target_list[i], !!value);
             }
             else if(!tn_is_ml)
             {
@@ -434,6 +394,175 @@ public Action Command_RoundDisqualified(int client, int args)
     }
 
     return Plugin_Handled;
+}
+
+public Action Command_RoundDisqualifiedPlayer(int client, int args)
+{
+    if(!g_cvEnable.BoolValue)
+    {
+        CPrintToChat(client, "%t", "Jailwars Disabled");
+        return Plugin_Handled;
+    }
+
+    if(!IsValidClient(client))
+        return Plugin_Handled;
+
+    char buffer[64];
+
+    if(!GetCmdArg(1, buffer, sizeof(buffer)))
+    {
+        CPrintToChat(client, "> Usage: sm_disqualifyplayer <userid/playername> <optional:reason>");
+        return Plugin_Handled;
+    }
+
+    char target_name[MAX_TARGET_LENGTH];
+    
+    int target_list[MAXPLAYERS];
+    bool tn_is_ml;
+    int target_count;
+
+    target_count = ProcessTargetString(buffer, client, target_list, MAXPLAYERS, COMMAND_FILTER_NO_MULTI, target_name, sizeof(target_name), tn_is_ml);
+    
+    if (target_count < 1)
+	{
+		ReplyToTargetError(client, target_count);
+	}
+
+    int iTarget = target_list[0];
+
+    if(GetClientTeam(iTarget) != CS_TEAM_T && GetClientTeam(iTarget) !=  CS_TEAM_CT)
+    {
+        ReplyToCommand(client, "%t", "CMD_OnlyInTeam");
+        return Plugin_Handled;
+    }
+
+    char sReasonStr[128];
+    char sArgPart[128];
+    for (int iArg = 2; iArg <= args; iArg++)
+    {
+        GetCmdArg(iArg, sArgPart, sizeof(sArgPart));
+        Format(sReasonStr, sizeof(sReasonStr), "%s %s", sReasonStr, sArgPart);
+    }
+    // Remove the space at the beginning
+    TrimString(sReasonStr);
+
+    if(g_iClientInChargeRoundDisqualified > -1 && IsValidClient(g_iClientInChargeRoundDisqualified))
+    {
+        CPrintToChat(client, "%t", "Round Already Disqualified", g_iClientInChargeRoundDisqualified);
+        return Plugin_Handled;
+    }
+
+    if(GetClientTeam(iTarget) == CS_TEAM_CT)
+    {
+        bool bNextRound = true;
+
+        SwapTeam(iTarget, bNextRound);
+    }
+
+    g_iClientInChargeRoundDisqualified = client;
+
+    int roundNumber = GameRules_GetProp("m_totalRoundsPlayed") + 1;
+
+    SetHudTextParams(g_fHudPosX, g_fHudPosY, g_fHudUpdate, g_iHudRgba[0], g_iHudRgba[1], g_iHudRgba[2], g_iHudRgba[3], 0, 0.0, 0.0, 0.0);
+
+    if(StrEqual(sReasonStr, ""))
+    {
+        CPrintToChatAll("%t", "Chat Round Disqualified Player No Reason", iTarget);
+        DisplayCenterTextToAll("%t", "Global Round Disqualified Player No Reason", iTarget);
+        ShowSyncHudText(client, g_hHUD, "%t", "Global Round Disqualified Player No Reason", iTarget);
+
+        for(int i = 1; i <= MaxClients; i++)
+        {
+            if(IsClientInGame(i) && IsPlayerAlive(i))
+            {
+                SetEntityMoveType(i, MOVETYPE_NONE);
+                SetEntProp(i, Prop_Data, "m_takedamage", GOD_ON, 1);
+            }
+        }
+
+        CS_TerminateRound(g_cvRoundDisqualifiedEndTime.FloatValue, CSRoundEnd_Draw, true);
+
+        if(g_cvLogEnable.BoolValue)
+        {
+            LogToFileEx(g_sFilePath, "\"%N\" desqualificou a ronda %i devido jogador %N sem razão", client, roundNumber, iTarget);
+        }
+    }
+    else
+    {
+        CPrintToChatAll("%t", "Chat Round Disqualified Player With Reason", iTarget, sReasonStr);
+        DisplayCenterTextToAll("%t", "Global Round Disqualified Player With Reason", iTarget, sReasonStr);
+        ShowSyncHudText(client, g_hHUD, "%t", "Global Round Disqualified Player With Reason", iTarget, sReasonStr);
+
+        for(int i = 1; i <= MaxClients; i++)
+        {
+            if(IsClientInGame(i) && IsPlayerAlive(i))
+            {
+                SetEntityMoveType(i, MOVETYPE_NONE);
+                SetEntProp(i, Prop_Data, "m_takedamage", GOD_ON, 1);
+            }
+        }
+
+        CS_TerminateRound(g_cvRoundDisqualifiedEndTime.FloatValue, CSRoundEnd_Draw, true);
+
+        if(g_cvLogEnable.BoolValue)
+        {
+            LogToFileEx(g_sFilePath, "\"%N\" desqualificou a ronda %i devidor jogador %N com a razão: %s", client, roundNumber, iTarget, sReasonStr);
+        }
+    }
+
+    return Plugin_Handled;
+}
+
+void SwapTeam(int client, bool bNextRound)
+{
+    int team = GetClientTeam(client);
+    
+    int indexTeam = GetIndexTeamScoreboard(team);
+                
+    int oppositeIndexTeam = GetOppositeIndexTeamScoreboard(team);
+
+    g_iScoreBoard[client][indexTeam].iFrags = GetEntProp(client, Prop_Data, "m_iFrags");
+    SetEntProp(client, Prop_Data, "m_iFrags", g_iScoreBoard[client][oppositeIndexTeam].iFrags);
+
+    g_iScoreBoard[client][indexTeam].iDeaths = GetEntProp(client, Prop_Data, "m_iDeaths");
+    SetEntProp(client, Prop_Data, "m_iDeaths", g_iScoreBoard[client][oppositeIndexTeam].iDeaths);
+
+    g_iScoreBoard[client][indexTeam].iMVPs = CS_GetMVPCount(client);
+    CS_SetMVPCount(client, g_iScoreBoard[client][oppositeIndexTeam].iMVPs);
+
+    g_iScoreBoard[client][indexTeam].iScore = CS_GetClientContributionScore(client);
+    CS_SetClientContributionScore(client, g_iScoreBoard[client][oppositeIndexTeam].iScore);
+
+    g_iScoreBoard[client][indexTeam].iAssists = CS_GetClientAssists(client);
+    CS_SetClientAssists(client, g_iScoreBoard[client][oppositeIndexTeam].iAssists);
+
+    if(!bNextRound)
+    {
+        if(team == CS_TEAM_T)
+        {
+            CS_SwitchTeam(client, CS_TEAM_CT);
+        }
+        else
+        {
+            CS_SwitchTeam(client, CS_TEAM_T);
+        }
+        
+        if(IsPlayerAlive(client))
+        {
+            CS_RespawnPlayer(client);
+        }
+
+        return;
+    }
+
+    if(team == CS_TEAM_T)
+    {
+        SetEntProp(client, Prop_Data, "m_iPendingTeamNum", CS_TEAM_CT);
+    }
+    else
+    {
+        SetEntProp(client, Prop_Data, "m_iPendingTeamNum", CS_TEAM_T);
+    }
 }
 
 void SetArmorPrisioner(int client)

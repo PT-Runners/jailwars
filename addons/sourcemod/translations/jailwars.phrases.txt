@@ -58,4 +58,28 @@
 	{
 		"en"		"A ronda foi {green}retomada{default}."
 	}
+
+	"Global Round Disqualified Player No Reason"
+	{
+		"#format"	"{1:N}"
+		"en"		">> Ronda desqualificada devido ao jogador {1} <<"
+	}
+
+    "Global Round Disqualified Player With Reason"
+	{
+		"#format"	"{1:N},{2:s}"
+		"en"		">> Ronda desqualificada devido ao jogador {1}, razão: {2} <<"
+	}
+
+    "Chat Round Disqualified Player No Reason"
+	{
+		"#format"	"{1:N}"
+		"en"		"> {darkred}Ronda desqualificada devido ao jogador {1}!"
+	}
+
+    "Chat Round Disqualified Player With Reason"
+	{
+		"#format"	"{1:N},{2:s}"
+		"en"		"> {darkred}Ronda desqualificada {default}devido ao jogador {1}, razão: {lightred}{2}!"
+	}
 }
