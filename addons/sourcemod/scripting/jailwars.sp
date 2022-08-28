@@ -36,7 +36,7 @@ Handle g_hRoundTimer;
 
 float g_fHudPosX = -1.0;
 float g_fHudPosY = 0.2;
-float g_fHudUpdate = 5.0; 
+float g_fHudUpdate = 5.0;
 
 char g_sRandomPrisonerWeapon[64];
 char g_sFilePath[PLATFORM_MAX_PATH];
@@ -99,23 +99,23 @@ public void OnConfigsExecuted()
         return;
 
     BuildPath(Path_SM, g_sFilePath, sizeof(g_sFilePath), "logs/jailwars");
-    
+
     if (!DirExists(g_sFilePath))
     {
         CreateDirectory(g_sFilePath, 511);
-        
+
         if (!DirExists(g_sFilePath))
             SetFailState("Failed to create directory at /sourcemod/logs/jailwars - Please manually create that path and reload this plugin.");
     }
 
     char FormatedTime[100];
     char MapName[100];
-        
+
     int CurrentTime = GetTime();
-    
+
     GetCurrentMap(MapName, 100);
     FormatTime(FormatedTime, 100, "%d_%b_%Y_%H_%M_%S", CurrentTime); //name the file 'day month year'
-    
+
     BuildPath(Path_SM, g_sFilePath, sizeof(g_sFilePath), "/logs/jailwars/%s_%s.txt", FormatedTime, MapName);
 }
 
@@ -133,7 +133,7 @@ public void Event_RoundPreStart(Handle event, const char[] name, bool dontBroadc
 
         if(indexTeam == -1)
             continue;
-        
+
         g_iScoreBoard[i][indexTeam].iFrags = GetEntProp(i, Prop_Data, "m_iFrags");
         g_iScoreBoard[i][indexTeam].iDeaths = GetEntProp(i, Prop_Data, "m_iDeaths");
         g_iScoreBoard[i][indexTeam].iMVPs = CS_GetMVPCount(i);
@@ -171,7 +171,7 @@ public void Event_RoundStart(Event event, char[] name, bool dontBroadcast)
         strcopy(szWeaponName, sizeof(szWeaponName), g_sRandomPrisonerWeapon);
         ReplaceString(szWeaponName, sizeof(szWeaponName), "weapon_", "");
 
-        CPrintToChat(client, "{green}> {default}Recebeste uma %s.", szWeaponName);
+        CReplyToCommand(client, "{green}> {default}Recebeste uma %s.", szWeaponName);
         break;
     }
 }
@@ -180,7 +180,7 @@ public void OnClientPostAdminCheck(int client)
 {
     if(!g_cvEnable.BoolValue)
         return;
-        
+
     SDKHook(client, SDKHook_SpawnPost, OnPlayerSpawnPost);
 }
 
@@ -214,7 +214,7 @@ public Action Command_Pause(int client, int args)
 {
     if(!g_cvEnable.BoolValue)
     {
-        CPrintToChat(client, "%t", "Jailwars Disabled");
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
         return Plugin_Handled;
     }
 
@@ -242,7 +242,7 @@ public Action Command_Pause(int client, int args)
     {
         pauseTime = 600.0;
     }
-    
+
     Pause(pauseTime);
 
     CPrintToChatAll("{darkred}--------------{default}");
@@ -256,42 +256,42 @@ public Action CMD_SwapRs(int client, int args)
 {
     if(!g_cvEnable.BoolValue)
     {
-        CPrintToChat(client, "%t", "Jailwars Disabled");
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
         return Plugin_Handled;
     }
 
     if(!IsClientInGame(client))
         return Plugin_Handled;
-    
+
     if((args != 1) && (args != 2))
     {
-        ReplyToCommand(client, "%t", "CMD_Swap_Usage");
+        CReplyToCommand(client, "%t", "CMD_Swap_Usage");
         return Plugin_Handled;
     }
-    
+
     char target_name[MAX_TARGET_LENGTH];
     char buffer[64];
     int target_list[MAXPLAYERS];
     bool tn_is_ml;
     int target_count;
-    
+
     GetCmdArg(1, buffer, sizeof(buffer));
     if(StrEqual(buffer, "@spec", false) || StrEqual(buffer, "@spectator", false))
     {
-        ReplyToCommand(client, "%t", "CMD_OnlyInTeam");
+        CReplyToCommand(client, "%t", "CMD_OnlyInTeam");
         return Plugin_Handled;
     }
-    
+
     if((target_count = ProcessTargetString(buffer, client, target_list, MAXPLAYERS, COMMAND_FILTER_CONNECTED, target_name, sizeof(target_name), tn_is_ml)) <= 0)
     {
         ReplyToTargetError(client, target_count);
         return Plugin_Handled;
     }
-    
+
     GetCmdArg(2, buffer, sizeof(buffer));
     int value = StringToInt(buffer);
     int team;
-    
+
     for(int i = 0; i < target_count; i++)
     {
         if(IsClientInGame(target_list[i]))
@@ -303,12 +303,12 @@ public Action CMD_SwapRs(int client, int args)
             }
             else if(!tn_is_ml)
             {
-                ReplyToCommand(client, "%t", "CMD_OnlyInTeam");
+                CReplyToCommand(client, "%t", "CMD_OnlyInTeam");
                 return Plugin_Handled;
             }
         }
     }
-    
+
     if(tn_is_ml)
     {
         ShowActivity2(client, ">", "%t", "CMD_Swap", target_name);
@@ -326,7 +326,7 @@ public Action Command_RoundDisqualified(int client, int args)
 {
     if(!g_cvEnable.BoolValue)
     {
-        CPrintToChat(client, "%t", "Jailwars Disabled");
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
         return Plugin_Handled;
     }
 
@@ -335,7 +335,7 @@ public Action Command_RoundDisqualified(int client, int args)
 
     if(g_iClientInChargeRoundDisqualified > -1 && IsValidClient(g_iClientInChargeRoundDisqualified))
     {
-        CPrintToChat(client, "%t", "Round Already Disqualified", g_iClientInChargeRoundDisqualified);
+        CReplyToCommand(client, "%t", "Round Already Disqualified", g_iClientInChargeRoundDisqualified);
         return Plugin_Handled;
     }
 
@@ -400,7 +400,7 @@ public Action Command_RoundDisqualifiedPlayer(int client, int args)
 {
     if(!g_cvEnable.BoolValue)
     {
-        CPrintToChat(client, "%t", "Jailwars Disabled");
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
         return Plugin_Handled;
     }
 
@@ -411,18 +411,18 @@ public Action Command_RoundDisqualifiedPlayer(int client, int args)
 
     if(!GetCmdArg(1, buffer, sizeof(buffer)))
     {
-        CPrintToChat(client, "> Usage: sm_disqualifyplayer <userid/playername> <optional:reason>");
+        CReplyToCommand(client, "> Usage: sm_disqualifyplayer <userid/playername> <optional:reason>");
         return Plugin_Handled;
     }
 
     char target_name[MAX_TARGET_LENGTH];
-    
+
     int target_list[MAXPLAYERS];
     bool tn_is_ml;
     int target_count;
 
     target_count = ProcessTargetString(buffer, client, target_list, MAXPLAYERS, COMMAND_FILTER_NO_MULTI, target_name, sizeof(target_name), tn_is_ml);
-    
+
     if (target_count < 1)
 	{
 		ReplyToTargetError(client, target_count);
@@ -432,7 +432,7 @@ public Action Command_RoundDisqualifiedPlayer(int client, int args)
 
     if(GetClientTeam(iTarget) != CS_TEAM_T && GetClientTeam(iTarget) !=  CS_TEAM_CT)
     {
-        ReplyToCommand(client, "%t", "CMD_OnlyInTeam");
+        CReplyToCommand(client, "%t", "CMD_OnlyInTeam");
         return Plugin_Handled;
     }
 
@@ -448,7 +448,7 @@ public Action Command_RoundDisqualifiedPlayer(int client, int args)
 
     if(g_iClientInChargeRoundDisqualified > -1 && IsValidClient(g_iClientInChargeRoundDisqualified))
     {
-        CPrintToChat(client, "%t", "Round Already Disqualified", g_iClientInChargeRoundDisqualified);
+        CReplyToCommand(client, "%t", "Round Already Disqualified", g_iClientInChargeRoundDisqualified);
         return Plugin_Handled;
     }
 
@@ -516,9 +516,9 @@ public Action Command_RoundDisqualifiedPlayer(int client, int args)
 void SwapTeam(int client, bool bNextRound)
 {
     int team = GetClientTeam(client);
-    
+
     int indexTeam = GetIndexTeamScoreboard(team);
-                
+
     int oppositeIndexTeam = GetOppositeIndexTeamScoreboard(team);
 
     g_iScoreBoard[client][indexTeam].iFrags = GetEntProp(client, Prop_Data, "m_iFrags");
@@ -546,7 +546,7 @@ void SwapTeam(int client, bool bNextRound)
         {
             CS_SwitchTeam(client, CS_TEAM_T);
         }
-        
+
         if(IsPlayerAlive(client))
         {
             CS_RespawnPlayer(client);
@@ -583,14 +583,14 @@ void SetArmorPrisioner(int client)
         return;
 
     SetEntProp(client, Prop_Data, "m_ArmorValue", g_cvPrisonersArmor.IntValue);
-    CPrintToChat(client, "{green}> {default}Recebeste %i armadura.", g_cvPrisonersArmor.IntValue);
+    CReplyToCommand(client, "{green}> {default}Recebeste %i armadura.", g_cvPrisonersArmor.IntValue);
 }
 
 void DisplayCenterTextToAll(const char[] message, any ...)
 {
     char buffer[MAX_MESSAGE_LENGTH];
     VFormat(buffer, sizeof(buffer), message, 2);
-    
+
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsClientInGame(i) || IsFakeClient(i))
@@ -700,7 +700,7 @@ void Pause(float pauseTime)
     }
 
     g_iRoundTime = GameRules_GetProp("m_iRoundTime", 4, 0);
-    
+
     GameRules_SetProp("m_iRoundTime", -1);
 
     for(int i = 1; i < MaxClients; i++) {
