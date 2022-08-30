@@ -37,11 +37,11 @@
 	{
 		"en"		"> Usa: sm_swaprs <target> <[0/1] agora/ronda seguinte>"
 	}
-	
+
 	"CMD_Swap"
 	{
 		"#format"	"{1:t}"
-		"en"		"{1} foi trocado de equipa (resetscore)"
+		"en"		"> {1} foi trocado de equipa (resetscore)"
 	}
 
 	"CMD_OnlyInTeam"
@@ -81,5 +81,37 @@
 	{
 		"#format"	"{1:N},{2:s}"
 		"en"		"> {darkred}Ronda desqualificada {default}devido ao jogador {1}, razão: {lightred}{2}!"
+	}
+
+    "Staff Spec List Enabled"
+    {
+        "en"		"> A lista de staff espetadores foi {green}ativada{default}."
+    }
+
+    "Staff Spec List Disabled"
+    {
+        "en"		"> A lista de staff espetadores foi {darkred}desativada{default}."
+    }
+
+    "Count CT Spec No Players Found"
+    {
+        "en"		"> Não foi encontrado jogadores a dar spectate como staff."
+    }
+
+    "Count CT Spec Player"
+    {
+        "#format"	"{1:N},{2:i}"
+        "en"		"Jogador: {1} | Specs: {2}"
+    }
+
+    "Spectating"
+    {
+        "#format"	"{1:N}"
+        "en"		"A observar {1}:\n\n"
+    }
+
+    "CMD_DisqualifyPlayer_Usage"
+	{
+		"en"		"> Usa: sm_desqualificarjogador <userid/nome jogador> <opcional:razão>"
 	}
 }
