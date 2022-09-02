@@ -106,6 +106,7 @@ public void OnPluginStart()
     LoadTranslations("jailwars.phrases");
 
     HookEvent("round_prestart", Event_RoundPreStart, EventHookMode_Pre);
+    HookEvent("round_end", Event_RoundPreEnd, EventHookMode_Pre);
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
 }
 
@@ -176,8 +177,11 @@ public void Event_RoundPreStart(Handle event, const char[] name, bool dontBroadc
 {
     delete g_hRoundTimer;
     g_iRoundTime = -1;
+}
 
-    for(int i = 1; i < MAXPLAYERS; i++)
+public void Event_RoundPreEnd(Handle event, const char[] name, bool dontBroadcast)
+{
+    for(int i = 1; i <= MaxClients; i++)
     {
         if(!IsClientInGame(i))
             continue;
@@ -903,7 +907,7 @@ void Pause(float pauseTime)
 
     GameRules_SetProp("m_iRoundTime", -1);
 
-    for(int i = 1; i < MaxClients; i++) {
+    for(int i = 1; i <= MaxClients; i++) {
 
         if(!IsValidClient(i, true, false))
             continue;
@@ -926,7 +930,7 @@ void Unpause()
 
     GameRules_SetProp("m_iRoundTime", g_iRoundTime, 4, 0);
 
-    for(int i = 1; i < MaxClients; i++) {
+    for(int i = 1; i <= MaxClients; i++) {
 
         if(!IsValidClient(i, true, false))
             continue;
