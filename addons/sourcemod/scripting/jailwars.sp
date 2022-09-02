@@ -44,6 +44,7 @@ ConVar g_cvRandomPrisonerWeapon;
 ConVar g_cvLogEnable;
 ConVar g_cvRoundDisqualifiedEndTime;
 ConVar g_cvPauseTime;
+ConVar g_cvRestartGame;
 
 Handle g_hHUD;
 Handle g_hRoundTimer;
@@ -63,6 +64,9 @@ int g_iHudRgba[4] = { 139, 0, 0 , 255};
 int g_iHudStaffSpecListRgba[4] = { 255, 255, 0 , 255};
 int g_iClientInChargeRoundDisqualified = -1;
 int g_iRoundTime = -1;
+
+bool g_bIsWarmup = false;
+bool g_bIsFreeday = false;
 
 // Info
 public Plugin myinfo = {
@@ -108,6 +112,9 @@ public void OnPluginStart()
     HookEvent("round_prestart", Event_RoundPreStart, EventHookMode_Pre);
     HookEvent("round_end", Event_RoundPreEnd, EventHookMode_Pre);
     HookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
+
+    g_cvRestartGame = FindConVar("mp_restartgame");
+    g_cvRestartGame.AddChangeHook(OnConVarChanged);
 }
 
 public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -118,6 +125,10 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
     {
         if(g_cvEnable.BoolValue)
         {
+            g_bIsWarmup = GameRules_GetProp("m_bWarmupPeriod") == 1;
+
+            g_bIsFreeday = IsFreeday();
+
             // Enable timers on all players in game.
             for(int i = 1; i <= MaxClients; i++)
             {
@@ -144,6 +155,11 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
                 KillHudHintTimer(i);
             }
         }
+    }
+    else if(convar == g_cvRestartGame)
+    {
+        if(g_cvEnable.BoolValue)
+            ResetScoreboardStats();
     }
 }
 
@@ -181,6 +197,23 @@ public void Event_RoundPreStart(Handle event, const char[] name, bool dontBroadc
 
 public void Event_RoundPreEnd(Handle event, const char[] name, bool dontBroadcast)
 {
+    if(!g_cvEnable.BoolValue)
+        return;
+
+    if(g_bIsWarmup)
+    {
+        ResetScoreboardStats();
+        g_bIsWarmup = false;
+        return;
+    }
+
+    if(g_bIsFreeday)
+    {
+        ResetScoreboardStats();
+        g_bIsFreeday = false;
+        return;
+    }
+
     for(int i = 1; i <= MaxClients; i++)
     {
         if(!IsClientInGame(i))
@@ -204,6 +237,10 @@ public void Event_RoundStart(Event event, char[] name, bool dontBroadcast)
 {
     if(!g_cvEnable.BoolValue)
         return;
+
+    g_bIsWarmup = GameRules_GetProp("m_bWarmupPeriod") == 1;
+
+    g_bIsFreeday = IsFreeday();
 
     g_iClientInChargeRoundDisqualified = -1;
 
@@ -1055,4 +1092,36 @@ void KillHudHintTimer(int client)
         KillTimer(g_hStaffSpeclistHudHintTimers[client]);
         g_hStaffSpeclistHudHintTimers[client] = INVALID_HANDLE;
     }
+}
+
+void ResetScoreboardStats()
+{
+    for(int i = 1; i <= MaxClients; i++)
+    {
+        if(!IsClientInGame(i))
+            continue;
+
+        for(int team = 0; team <= 1; team++)
+        {
+            g_iScoreBoard[i][team].iFrags = 0;
+            g_iScoreBoard[i][team].iDeaths = 0;
+            g_iScoreBoard[i][team].iMVPs = 0;
+            g_iScoreBoard[i][team].iScore = 0;
+            g_iScoreBoard[i][team].iAssists = 0;
+        }
+    }
+}
+
+bool IsFreeday()
+{
+    if(!MyJailbreak_IsEventDayRunning())
+        return false;
+
+    char EventDay[64];
+    MyJailbreak_GetEventDayName(EventDay);
+
+    if(!StrEqual(EventDay, "freeday", false))
+        return false;
+
+    return true;
 }
