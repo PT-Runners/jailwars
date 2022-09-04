@@ -20,6 +20,7 @@
 
 #define STAFF_SPECLIST_UPDATE_INTERVAL 0.5
 #define STAFF_SPECLIST_FLAG "d"
+#define CONFIG_DIR "sourcemod/jailwars/"
 
 enum struct ScoreboardStats
 {
@@ -125,6 +126,8 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
     {
         if(g_cvEnable.BoolValue)
         {
+            ExecuteStartConfigJailwars();
+
             g_bIsWarmup = GameRules_GetProp("m_bWarmupPeriod") == 1;
 
             g_bIsFreeday = IsFreeday();
@@ -165,6 +168,11 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
 
 public void OnConfigsExecuted()
 {
+    if(g_cvEnable.BoolValue)
+    {
+        ExecuteStartConfigJailwars();
+    }
+
     if(!g_cvEnable.BoolValue || !g_cvLogEnable.BoolValue)
         return;
 
@@ -695,7 +703,7 @@ public Action Command_RoundDisqualifiedPlayer(int client, int args)
 
     if(GetClientTeam(iTarget) == CS_TEAM_CT)
     {
-        bool bNextRound = true;
+        bool bNextRound = false;
 
         SwapTeam(iTarget, bNextRound);
     }
@@ -1124,4 +1132,9 @@ bool IsFreeday()
         return false;
 
     return true;
+}
+
+void ExecuteStartConfigJailwars()
+{
+    ServerCommand("exec %s%s", CONFIG_DIR, "start.cfg");
 }
