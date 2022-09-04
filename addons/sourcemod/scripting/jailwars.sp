@@ -18,7 +18,7 @@
 #define SPECMODE_3RDPERSON 			5
 #define SPECMODE_FREELOOK	 		6
 
-#define STAFF_SPECLIST_UPDATE_INTERVAL 0.5
+#define STAFF_SPECLIST_UPDATE_INTERVAL 0.2
 #define STAFF_SPECLIST_FLAG "d"
 #define CONFIG_DIR "sourcemod/jailwars/"
 
