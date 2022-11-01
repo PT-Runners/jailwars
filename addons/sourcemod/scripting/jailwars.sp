@@ -18,8 +18,12 @@
 #define SPECMODE_3RDPERSON 			5
 #define SPECMODE_FREELOOK	 		6
 
+#define SPECLIST_FLAG "d"
 #define STAFF_SPECLIST_UPDATE_INTERVAL 0.2
-#define STAFF_SPECLIST_FLAG "d"
+#define COUNT_CT_SPECLIST_UPDATE_INTERVAL 0.9
+
+#define COUNT_CT_SPECLIST_SYSTEM_UPDATE_INTERVAL 1.0
+
 #define CONFIG_DIR "sourcemod/jailwars/"
 
 enum struct ScoreboardStats
@@ -49,20 +53,33 @@ ConVar g_cvRestartGame;
 
 Handle g_hHUD;
 Handle g_hRoundTimer;
+Handle g_hCountCTSpecTimer;
 Handle g_hStaffSpeclistHudHintTimers[MAXPLAYERS+1];
+Handle g_hCountCTSpeclistHudHintTimers[MAXPLAYERS+1];
+
+ArrayList g_aCountCTSpecList;
 
 float g_fHudPosX = -1.0;
 float g_fHudPosY = 0.2;
 float g_fHudUpdate = 5.0;
+
 float g_fHudStaffSpeclistPosX = 0.2;
 float g_fHudStaffSpeclistPosY = 0.2;
 float g_fHudStaffSpeclistUpdate = 2.0;
+
+float g_fHudCountCTSpeclistPosX = -1.0;
+float g_fHudCountCTSpeclistPosY = 0.2;
+float g_fHudCountCTSpeclistUpdate = 2.0;
 
 char g_sRandomPrisonerWeapon[64];
 char g_sFilePath[PLATFORM_MAX_PATH];
 
 int g_iHudRgba[4] = { 139, 0, 0 , 255};
+
 int g_iHudStaffSpecListRgba[4] = { 255, 255, 0 , 255};
+
+int g_iHudCountCTSpecListRgba[4] = { 140, 0, 0 , 255};
+
 int g_iClientInChargeRoundDisqualified = -1;
 int g_iRoundTime = -1;
 
@@ -94,6 +111,8 @@ public void OnPluginStart()
 
     g_hHUD = CreateHudSynchronizer();
 
+    g_aCountCTSpecList = new ArrayList();
+
     RegAdminCmd("sm_disqualify", Command_RoundDisqualified, ADMFLAG_BAN);
     RegAdminCmd("sm_desqualificar", Command_RoundDisqualified, ADMFLAG_BAN);
 
@@ -106,6 +125,7 @@ public void OnPluginStart()
 
     RegAdminCmd("sm_staffspeclist", Command_StaffSpecList, ADMFLAG_BAN);
     RegAdminCmd("sm_countctspec", Command_CountCTSpec, ADMFLAG_BAN);
+    RegAdminCmd("sm_countctspeclist", Command_CountCTSpecList, ADMFLAG_BAN);
 
     LoadTranslations("common.phrases.txt");
     LoadTranslations("jailwars.phrases");
@@ -128,6 +148,14 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
         {
             ExecuteStartConfigJailwars();
 
+            if (g_hCountCTSpecTimer != null)
+            {
+                KillTimer(g_hCountCTSpecTimer);
+                g_hCountCTSpecTimer = null;
+            }
+
+            g_hCountCTSpecTimer = CreateTimer(COUNT_CT_SPECLIST_SYSTEM_UPDATE_INTERVAL, Timer_CountCTSpecTimer, _, TIMER_REPEAT);
+
             g_bIsWarmup = GameRules_GetProp("m_bWarmupPeriod") == 1;
 
             g_bIsFreeday = IsFreeday();
@@ -138,7 +166,7 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
                 if (!IsClientInGame(i))
                     continue;
 
-                if(!CheckAdminFlag(i, STAFF_SPECLIST_FLAG))
+                if(!CheckAdminFlag(i, SPECLIST_FLAG))
                     continue;
 
                 CreateHudHintTimer(i);
@@ -146,16 +174,24 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
         }
         else
         {
+            if (g_hCountCTSpecTimer != null)
+            {
+                KillTimer(g_hCountCTSpecTimer);
+                g_hCountCTSpecTimer = null;
+            }
+
             // Kill all of the active timers.
             for(int i = 1; i <= MaxClients; i++)
             {
                 if (!IsClientInGame(i))
                     continue;
 
-                if(!CheckAdminFlag(i, STAFF_SPECLIST_FLAG))
+                if(!CheckAdminFlag(i, SPECLIST_FLAG))
                     continue;
 
                 KillHudHintTimer(i);
+                KillCountCTSpecHudHintTimer(i);
+
             }
         }
     }
@@ -171,6 +207,8 @@ public void OnConfigsExecuted()
     if(g_cvEnable.BoolValue)
     {
         ExecuteStartConfigJailwars();
+
+        g_hCountCTSpecTimer = CreateTimer(COUNT_CT_SPECLIST_SYSTEM_UPDATE_INTERVAL, Timer_CountCTSpecTimer, _, TIMER_REPEAT);
     }
 
     if(!g_cvEnable.BoolValue || !g_cvLogEnable.BoolValue)
@@ -285,18 +323,20 @@ public void OnClientPostAdminCheck(int client)
 
     SDKHook(client, SDKHook_SpawnPost, OnPlayerSpawnPost);
 
-    if(!CheckAdminFlag(client, STAFF_SPECLIST_FLAG))
+    if(!CheckAdminFlag(client, SPECLIST_FLAG))
         return;
 
     CreateHudHintTimer(client);
+    CreateCountCTSpecHudHintTimer(client);
 }
 
 public void OnClientDisconnect(int client)
 {
-    if(!CheckAdminFlag(client, STAFF_SPECLIST_FLAG))
+    if(!CheckAdminFlag(client, SPECLIST_FLAG))
         return;
 
     KillHudHintTimer(client);
+    KillCountCTSpecHudHintTimer(client);
 }
 
 public void OnPlayerSpawnPost(int client)
@@ -355,71 +395,7 @@ public Action Command_CountCTSpec(int client, int args)
         return Plugin_Handled;
     }
 
-    int iTarget, iSpecMode;
-
-    ArrayList spec = new ArrayList(sizeof(SpecPlayer));
-
-    int index;
-
-    for(int i = 1; i <= MaxClients; i++)
-    {
-        if (!IsClientInGame(i))
-            continue;
-
-        if(IsPlayerAlive(i) && GetClientTeam(i) == CS_TEAM_CT)
-        {
-            index = spec.FindValue(i, SpecPlayer::client);
-
-            if(index == -1)
-            {
-                SpecPlayer p;
-                p.client = i;
-                p.count = 0;
-                spec.PushArray(p);
-                continue;
-            }
-        }
-
-        if(!IsClientObserver(i) || IsFakeClient(i))
-            continue;
-
-        if(!CheckAdminFlag(i, STAFF_SPECLIST_FLAG))
-            continue;
-
-        iSpecMode = GetEntProp(i, Prop_Send, "m_iObserverMode");
-
-        // The client isn't spectating any one person, so ignore them.
-        if (iSpecMode != SPECMODE_FIRSTPERSON && iSpecMode != SPECMODE_3RDPERSON)
-            continue;
-
-        // Find out who the client is spectating.
-        iTarget = GetEntPropEnt(i, Prop_Send, "m_hObserverTarget");
-
-        if (!IsClientInGame(iTarget))
-            continue;
-
-        if(GetClientTeam(iTarget) != CS_TEAM_CT)
-            continue;
-
-        index = spec.FindValue(iTarget, SpecPlayer::client);
-
-        if(index == -1)
-        {
-            SpecPlayer p;
-            p.client = iTarget;
-            p.count = 1;
-            spec.PushArray(p);
-            continue;
-        }
-
-        SpecPlayer p;
-        spec.GetArray(index, p);
-        p.count++;
-
-        spec.SetArray(index, p);
-    }
-
-    spec.SortCustom(SpecDescSort);
+    ArrayList spec = GetCTSpecCountArrayList();
 
     if(spec.Length == 0)
     {
@@ -447,6 +423,28 @@ public Action Command_CountCTSpec(int client, int args)
     return Plugin_Handled;
 }
 
+public Action Command_CountCTSpecList(int client, int args)
+{
+    if(!g_cvEnable.BoolValue)
+    {
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
+        return Plugin_Handled;
+    }
+
+    if (g_hCountCTSpeclistHudHintTimers[client] != INVALID_HANDLE)
+    {
+        KillCountCTSpecHudHintTimer(client);
+        CReplyToCommand(client, "%t", "Count CT Spec List Disabled");
+    }
+    else
+    {
+        CreateCountCTSpecHudHintTimer(client);
+        CReplyToCommand(client, "%t", "Count CT Spec List Enabled");
+    }
+
+    return Plugin_Handled;
+}
+
 public int SpecDescSort(int index1, int index2, Handle array, Handle hndl)
 {
     SpecPlayer a, b;
@@ -457,6 +455,18 @@ public int SpecDescSort(int index1, int index2, Handle array, Handle hndl)
         return 0;
 
     return a.count > b.count ? -1 : 1;
+}
+
+public int SpecAscSort(int index1, int index2, Handle array, Handle hndl)
+{
+    SpecPlayer a, b;
+    GetArrayArray(array, index1, a);
+    GetArrayArray(array, index2, b);
+
+    if(a.count == a.client)
+        return 0;
+
+    return a.count > b.count ? 1 : -1;
 }
 
 public Action Command_Pause(int client, int args)
@@ -904,6 +914,16 @@ public Action Timer_RoundTimer(Handle timer)
     return Plugin_Continue;
 }
 
+public Action Timer_CountCTSpecTimer(Handle timer)
+{
+    if(g_hCountCTSpecTimer == null)
+        return Plugin_Stop;
+
+    g_aCountCTSpecList = GetCTSpecListCountArrayList();
+
+    return Plugin_Continue;
+}
+
 public Action Timer_Unpause(Handle timer)
 {
     if(!IsPaused())
@@ -1063,7 +1083,7 @@ public Action Timer_UpdateHudHint(Handle timer, any client)
             if (iSpecMode != SPECMODE_FIRSTPERSON && iSpecMode != SPECMODE_3RDPERSON)
                 continue;
 
-            if(!CheckAdminFlag(i, STAFF_SPECLIST_FLAG))
+            if(!CheckAdminFlag(i, SPECLIST_FLAG))
                 continue;
 
             // Find out who the client is spectating.
@@ -1088,6 +1108,42 @@ public Action Timer_UpdateHudHint(Handle timer, any client)
     return Plugin_Continue;
 }
 
+public Action Timer_UpdateCountCTSpecHudHint(Handle timer, any client)
+{
+    if (!IsClientInGame(client) || !IsClientObserver(client) || IsFakeClient(client))
+        return Plugin_Continue;
+
+    bool bDisplayHint = false;
+
+    char szText[2048];
+    szText[0] = '\0';
+
+    if(g_aCountCTSpecList == null)
+        return Plugin_Continue;
+
+    if(g_aCountCTSpecList.Length == 0)
+        return Plugin_Continue;
+
+    bDisplayHint = true;
+    Format(szText, sizeof(szText), "%t", "Count Spectators");
+
+    for(int i = 0; i < g_aCountCTSpecList.Length; i++)
+    {
+        SpecPlayer p;
+        g_aCountCTSpecList.GetArray(i, p);
+        Format(szText, sizeof(szText), "%s%N : %i\n", szText, p.client, p.count);
+    }
+
+    if (bDisplayHint)
+    {
+        SetHudTextParams(g_fHudCountCTSpeclistPosX, g_fHudCountCTSpeclistPosY, g_fHudCountCTSpeclistUpdate, g_iHudCountCTSpecListRgba[0], g_iHudCountCTSpecListRgba[1], g_iHudCountCTSpecListRgba[2], g_iHudCountCTSpecListRgba[3], 0, 0.0, 0.1, 0.1);
+        ShowHudText(client, -1, szText);
+        bDisplayHint = false;
+    }
+
+    return Plugin_Continue;
+}
+
 void CreateHudHintTimer(int client)
 {
     g_hStaffSpeclistHudHintTimers[client] = CreateTimer(STAFF_SPECLIST_UPDATE_INTERVAL, Timer_UpdateHudHint, client, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
@@ -1099,6 +1155,20 @@ void KillHudHintTimer(int client)
     {
         KillTimer(g_hStaffSpeclistHudHintTimers[client]);
         g_hStaffSpeclistHudHintTimers[client] = INVALID_HANDLE;
+    }
+}
+
+void CreateCountCTSpecHudHintTimer(int client)
+{
+    g_hCountCTSpeclistHudHintTimers[client] = CreateTimer(COUNT_CT_SPECLIST_UPDATE_INTERVAL, Timer_UpdateCountCTSpecHudHint, client, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+}
+
+void KillCountCTSpecHudHintTimer(int client)
+{
+    if (g_hCountCTSpeclistHudHintTimers[client] != INVALID_HANDLE)
+    {
+        KillTimer(g_hCountCTSpeclistHudHintTimers[client]);
+        g_hCountCTSpeclistHudHintTimers[client] = INVALID_HANDLE;
     }
 }
 
@@ -1137,4 +1207,161 @@ bool IsFreeday()
 void ExecuteStartConfigJailwars()
 {
     ServerCommand("exec %s%s", CONFIG_DIR, "start.cfg");
+}
+
+ArrayList GetCTSpecCountArrayList()
+{
+    int iTarget, iSpecMode;
+
+    ArrayList spec = new ArrayList(sizeof(SpecPlayer));
+
+    int index;
+
+    for(int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i))
+            continue;
+
+        if(IsPlayerAlive(i) && GetClientTeam(i) == CS_TEAM_CT)
+        {
+            index = spec.FindValue(i, SpecPlayer::client);
+
+            if(index == -1)
+            {
+                SpecPlayer p;
+                p.client = i;
+                p.count = 0;
+                spec.PushArray(p);
+                continue;
+            }
+        }
+
+        if(!IsClientObserver(i) || IsFakeClient(i))
+            continue;
+
+        if(!CheckAdminFlag(i, SPECLIST_FLAG))
+            continue;
+
+        iSpecMode = GetEntProp(i, Prop_Send, "m_iObserverMode");
+
+        // The client isn't spectating any one person, so ignore them.
+        if (iSpecMode != SPECMODE_FIRSTPERSON && iSpecMode != SPECMODE_3RDPERSON)
+            continue;
+
+        // Find out who the client is spectating.
+        iTarget = GetEntPropEnt(i, Prop_Send, "m_hObserverTarget");
+
+        if (!IsClientInGame(iTarget))
+            continue;
+
+        if(GetClientTeam(iTarget) != CS_TEAM_CT)
+            continue;
+
+        index = spec.FindValue(iTarget, SpecPlayer::client);
+
+        if(index == -1)
+        {
+            SpecPlayer p;
+            p.client = iTarget;
+            p.count = 1;
+            spec.PushArray(p);
+            continue;
+        }
+
+        SpecPlayer p;
+        spec.GetArray(index, p);
+        p.count++;
+
+        spec.SetArray(index, p);
+    }
+
+    spec.SortCustom(SpecDescSort);
+
+    return spec;
+}
+
+ArrayList GetCTSpecListCountArrayList()
+{
+    int iTarget, iSpecMode;
+
+    ArrayList spec = new ArrayList(sizeof(SpecPlayer));
+
+    int index;
+
+    for(int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i))
+            continue;
+
+        if(IsPlayerAlive(i) && GetClientTeam(i) == CS_TEAM_CT)
+        {
+            index = spec.FindValue(i, SpecPlayer::client);
+
+            if(index == -1)
+            {
+                SpecPlayer p;
+                p.client = i;
+                p.count = 0;
+                spec.PushArray(p);
+                continue;
+            }
+        }
+
+        if(!IsClientObserver(i) || IsFakeClient(i))
+            continue;
+
+        if(!CheckAdminFlag(i, SPECLIST_FLAG))
+            continue;
+
+        iSpecMode = GetEntProp(i, Prop_Send, "m_iObserverMode");
+
+        // The client isn't spectating any one person, so ignore them.
+        if (iSpecMode != SPECMODE_FIRSTPERSON && iSpecMode != SPECMODE_3RDPERSON)
+            continue;
+
+        // Find out who the client is spectating.
+        iTarget = GetEntPropEnt(i, Prop_Send, "m_hObserverTarget");
+
+        if (!IsClientInGame(iTarget))
+            continue;
+
+        if(GetClientTeam(iTarget) != CS_TEAM_CT)
+            continue;
+
+        index = spec.FindValue(iTarget, SpecPlayer::client);
+
+        if(index == -1)
+        {
+            SpecPlayer p;
+            p.client = iTarget;
+            p.count = 1;
+            spec.PushArray(p);
+            continue;
+        }
+
+        SpecPlayer p;
+        spec.GetArray(index, p);
+        p.count++;
+
+        spec.SetArray(index, p);
+    }
+
+    ArrayList filterSpec = spec.Clone();
+
+    for(int i = 0; i < spec.Length; i++)
+    {
+        SpecPlayer p;
+        spec.GetArray(i, p);
+
+        if(p.count == 1)
+        {
+            filterSpec.Erase(i);
+        }
+    }
+
+    filterSpec.SortCustom(SpecAscSort);
+
+    delete spec;
+
+    return filterSpec;
 }

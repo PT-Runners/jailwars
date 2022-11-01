@@ -114,4 +114,19 @@
 	{
 		"en"		"> Usa: sm_desqualificarjogador <userid/nome jogador> <opcional:razão>"
 	}
+
+    "Count Spectators"
+    {
+        "en"		"Contagem CT Spec: (!= 1)\n\n"
+    }
+
+    "Count CT Spec List Enabled"
+    {
+        "en"		"> A lista de contagem espetadores ct foi {green}ativada{default}."
+    }
+
+    "Count CT Spec List Disabled"
+    {
+        "en"		"> A lista de contagem espetadores ct foi {darkred}desativada{default}."
+    }
 }
