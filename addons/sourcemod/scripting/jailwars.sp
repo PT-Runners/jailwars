@@ -1089,6 +1089,9 @@ public Action Timer_UpdateHudHint(Handle timer, any client)
             // Find out who the client is spectating.
             iTarget = GetEntPropEnt(i, Prop_Send, "m_hObserverTarget");
 
+            if(iTarget == -1)
+                continue;
+
             // Are they spectating our player?
             if (iTarget == iTargetUser)
             {
@@ -1251,6 +1254,9 @@ ArrayList GetCTSpecCountArrayList()
         // Find out who the client is spectating.
         iTarget = GetEntPropEnt(i, Prop_Send, "m_hObserverTarget");
 
+        if(iTarget == -1)
+            continue;
+
         if (!IsClientInGame(iTarget))
             continue;
 
@@ -1321,6 +1327,9 @@ ArrayList GetCTSpecListCountArrayList()
 
         // Find out who the client is spectating.
         iTarget = GetEntPropEnt(i, Prop_Send, "m_hObserverTarget");
+
+        if(iTarget == -1)
+            continue;
 
         if (!IsClientInGame(iTarget))
             continue;
