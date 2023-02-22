@@ -24,6 +24,8 @@
 
 #define COUNT_CT_SPECLIST_SYSTEM_UPDATE_INTERVAL 1.0
 
+#define TOP_X_KILLS 10
+
 #define CONFIG_DIR "sourcemod/jailwars/"
 
 enum struct ScoreboardStats
@@ -39,6 +41,12 @@ enum struct SpecPlayer
 {
     int client;
     int count;
+}
+
+enum struct FragPlayer
+{
+    int client;
+    int frags;
 }
 
 ScoreboardStats g_iScoreBoard[MAXPLAYERS + 1][2];
@@ -126,6 +134,9 @@ public void OnPluginStart()
     RegAdminCmd("sm_staffspeclist", Command_StaffSpecList, ADMFLAG_BAN);
     RegAdminCmd("sm_countctspec", Command_CountCTSpec, ADMFLAG_BAN);
     RegAdminCmd("sm_countctspeclist", Command_CountCTSpecList, ADMFLAG_BAN);
+
+    RegAdminCmd("sm_topkills_jw_t", Command_TopKillsTerrorist, ADMFLAG_BAN);
+    RegAdminCmd("sm_topkills_jw_ct", Command_TopKillsCounterTerrorist, ADMFLAG_BAN);
 
     LoadTranslations("common.phrases.txt");
     LoadTranslations("jailwars.phrases");
@@ -443,6 +454,104 @@ public Action Command_CountCTSpecList(int client, int args)
     }
 
     return Plugin_Handled;
+}
+
+public Action Command_TopKillsTerrorist(int client, int args)
+{
+    if(!g_cvEnable.BoolValue)
+    {
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
+        return Plugin_Handled;
+    }
+
+    ArrayList a_TopKillsTerror = new ArrayList(sizeof(FragPlayer));
+    FragPlayer fragPlayer;
+
+    for(int i = 1; i <= MaxClients; i++)
+    {
+        if(!IsClientInGame(i))
+            continue;
+
+        int indexTeam = GetIndexTeamScoreboard(CS_TEAM_T);
+
+        if(indexTeam == -1)
+            continue;
+
+        fragPlayer.client = i;
+        fragPlayer.frags = g_iScoreBoard[i][indexTeam].iFrags;
+
+        a_TopKillsTerror.PushArray(fragPlayer, sizeof(FragPlayer));
+    }
+
+    a_TopKillsTerror.SortCustom(TopKillsDescSort);
+
+    for(int i = 0; i < TOP_X_KILLS; i++)
+    {
+        if(i >= a_TopKillsTerror.Length)
+            break;
+
+        a_TopKillsTerror.GetArray(i, fragPlayer, sizeof(FragPlayer));
+        
+        PrintToConsole(client, "%iº - Player: %N | Frags: %i", (i+1), fragPlayer.client, fragPlayer.frags);
+    }
+
+    delete a_TopKillsTerror;
+
+    return Plugin_Handled;
+}
+
+public Action Command_TopKillsCounterTerrorist(int client, int args)
+{
+    if(!g_cvEnable.BoolValue)
+    {
+        CReplyToCommand(client, "%t", "Jailwars Disabled");
+        return Plugin_Handled;
+    }
+
+    ArrayList a_TopKillsTerror = new ArrayList(sizeof(FragPlayer));
+    FragPlayer fragPlayer;
+
+    for(int i = 1; i <= MaxClients; i++)
+    {
+        if(!IsClientInGame(i))
+            continue;
+
+        int indexTeam = GetIndexTeamScoreboard(CS_TEAM_CT);
+
+        if(indexTeam == -1)
+            continue;
+
+        fragPlayer.client = i;
+        fragPlayer.frags = g_iScoreBoard[i][indexTeam].iFrags;
+
+        a_TopKillsTerror.PushArray(fragPlayer, sizeof(FragPlayer));
+    }
+
+    a_TopKillsTerror.SortCustom(TopKillsDescSort);
+
+    for(int i = 0; i < TOP_X_KILLS; i++)
+    {
+        if(i >= a_TopKillsTerror.Length)
+            break;
+
+        a_TopKillsTerror.GetArray(i, fragPlayer, sizeof(FragPlayer));
+        
+        PrintToConsole(client, "%iº - Player: %N | Frags: %i", (i+1), fragPlayer.client, fragPlayer.frags);
+    }
+
+    delete a_TopKillsTerror;
+
+    return Plugin_Handled;
+}
+
+public int TopKillsDescSort(int index1, int index2, Handle array, Handle hndl)
+{
+    FragPlayer a, b;
+    
+    GetArrayArray(array, index1, a);
+    GetArrayArray(array, index2, b);
+
+    return a.frags > b.frags ? -1 : 1;
 }
 
 public int SpecDescSort(int index1, int index2, Handle array, Handle hndl)
